@@ -1,0 +1,43 @@
+# No restart policy: containers run only between start.sh and stop.sh.
+# Two 2011 nodes on a private network with no internet access.
+#   satoshi 10.83.11.2  mines (start.sh: setgenerate true 2)
+#   hal     10.83.11.3  connects to satoshi, does not mine
+
+services:
+  satoshi:
+    build: { context: ., dockerfile: docker/Dockerfile }
+    image: bitcoin-0.3.24-private
+    hostname: satoshi
+    cpus: "2"                 # safety cap, matches MINER_CORES in start.sh
+    stop_grace_period: 60s    # give bitcoind time to flush its database
+    tty: true                 # line-buffered stdout, so the log (and dashboard) is live
+    volumes:
+      - ./conf/satoshi.conf:/etc/bitcoin/bitcoin.conf:ro
+      - satoshi-data:/data
+    networks:
+      chain2011: { ipv4_address: 10.83.11.2 }
+
+  hal:
+    build: { context: ., dockerfile: docker/Dockerfile }   # same image, built once
+    image: bitcoin-0.3.24-private
+    hostname: hal
+    cpus: "1"
+    stop_grace_period: 60s
+    tty: true
+    depends_on: [satoshi]
+    volumes:
+      - ./conf/hal.conf:/etc/bitcoin/bitcoin.conf:ro
+      - hal-data:/data
+    networks:
+      chain2011: { ipv4_address: 10.83.11.3 }
+
+networks:
+  chain2011:
+    internal: true            # no route to the internet
+    ipam:
+      config:
+        - subnet: 10.83.11.0/24
+
+volumes:
+  satoshi-data:
+  hal-data:
